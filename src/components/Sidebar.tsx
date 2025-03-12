@@ -7,8 +7,11 @@ import {
   MessageSquare,
   LineChart,
   Home,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,12 +20,13 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const navigation = [
     { name: "Home", href: "/", icon: Home },
-    { name: "Chat", href: "/chat", icon: MessageSquare },
-    { name: "Drug Calculator", href: "/calculator", icon: Calculator },
-    { name: "Growth Charts", href: "/growth-charts", icon: LineChart },
+    { name: "Chat", href: "/chat", icon: MessageSquare, requiresAuth: true },
+    { name: "Drug Calculator", href: "/calculator", icon: Calculator, requiresAuth: true },
+    { name: "Growth Charts", href: "/growth-charts", icon: LineChart, requiresAuth: true },
   ];
 
   return (
@@ -48,23 +52,52 @@ export const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
             </Button>
           </div>
           <div className="space-y-1 px-3">
-            {navigation.map((item) => (
-              <Button
-                key={item.name}
-                variant={location.pathname === item.href ? "secondary" : "ghost"}
-                className={cn(
-                  "w-full justify-start",
-                  !isOpen && "hidden"
-                )}
-                asChild
-              >
-                <Link to={item.href}>
-                  <item.icon className="mr-2 h-4 w-4" />
-                  {item.name}
-                </Link>
-              </Button>
-            ))}
+            {navigation.map((item) => {
+              // Skip auth-requiring routes if user is not logged in
+              if (item.requiresAuth && !user) return null;
+              
+              return (
+                <Button
+                  key={item.name}
+                  variant={location.pathname === item.href ? "secondary" : "ghost"}
+                  className={cn(
+                    "w-full justify-start",
+                    !isOpen && "hidden"
+                  )}
+                  asChild
+                >
+                  <Link to={item.href}>
+                    <item.icon className="mr-2 h-4 w-4" />
+                    {item.name}
+                  </Link>
+                </Button>
+              );
+            })}
           </div>
+        </div>
+        
+        <div className="mt-auto px-3 pb-4">
+          {user ? (
+            <Button
+              variant="outline" 
+              className={cn("w-full justify-start", !isOpen && "hidden")}
+              onClick={() => logout()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className={cn("w-full justify-start", !isOpen && "hidden")}
+              asChild
+            >
+              <Link to="/auth">
+                <LogIn className="mr-2 h-4 w-4" />
+                Login / Register
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </div>
