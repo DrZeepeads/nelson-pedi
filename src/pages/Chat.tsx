@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
+import { useToast } from "@/hooks/use-toast";
 
 const Chat = () => {
   const [message, setMessage] = useState("");
@@ -14,6 +14,7 @@ const Chat = () => {
   const [isTyping, setIsTyping] = useState(false);
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -23,7 +24,14 @@ const Chat = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to use the chat feature.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     // Add user message
     setMessages(prev => [...prev, { text: message, sender: "user" }]);
@@ -34,7 +42,6 @@ const Chat = () => {
     setIsTyping(true);
 
     try {
-      // Call Supabase edge function
       const { data, error } = await supabase.functions.invoke('nelson-chat', {
         body: {
           message: userQuestion,
@@ -42,17 +49,30 @@ const Chat = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw new Error(error.message);
+      }
+
+      if (!data || !data.answer) {
+        throw new Error("Invalid response from AI");
+      }
 
       // Add AI response
       setMessages(prev => [...prev, { 
         text: data.answer, 
         sender: "ai" 
       }]);
-    } catch (error) {
-      console.error("Error calling nelson-chat function:", error);
+    } catch (error: any) {
+      console.error("Error in chat:", error);
+      const errorMessage = error?.message || "An unexpected error occurred";
+      toast({
+        title: "Chat Error",
+        description: "There was an error processing your request. Please try again.",
+        variant: "destructive"
+      });
       setMessages(prev => [...prev, { 
-        text: "I apologize, but I encountered an error processing your request. Please try again later.", 
+        text: "I apologize, but I encountered an error processing your request. Please try again in a moment.", 
         sender: "ai" 
       }]);
     } finally {

@@ -16,7 +16,7 @@ serve(async (req) => {
   try {
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     if (!GEMINI_API_KEY) {
-      throw new Error('Missing GEMINI_API_KEY');
+      throw new Error('Missing Gemini API configuration');
     }
 
     // Get Supabase connection from environment variables
@@ -24,7 +24,7 @@ serve(async (req) => {
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
     
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new Error('Missing Supabase environment variables');
+      throw new Error('Missing Supabase configuration');
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -42,8 +42,7 @@ serve(async (req) => {
     // Log the incoming request
     console.log(`Processing request from user ${userId}: "${message}"`);
 
-    // Perform semantic search to retrieve relevant chunks from Nelson textbook
-    // For simplicity, we're searching in both tables: chapter_chunks and nelson_chunks
+    // Perform semantic search
     const { data: chapterChunks, error: chapterError } = await supabase
       .from('chapter_chunks')
       .select('content, chapter')
@@ -52,6 +51,11 @@ serve(async (req) => {
         config: 'english'
       })
       .limit(3);
+
+    if (chapterError) {
+      console.error("Chapter search error:", chapterError);
+      throw new Error('Error searching chapter content');
+    }
 
     const { data: nelsonChunks, error: nelsonError } = await supabase
       .from('nelson_chunks')
@@ -62,9 +66,9 @@ serve(async (req) => {
       })
       .limit(3);
 
-    if (chapterError || nelsonError) {
-      console.error("Search error:", chapterError || nelsonError);
-      throw new Error('Error searching for relevant medical information');
+    if (nelsonError) {
+      console.error("Nelson chunks search error:", nelsonError);
+      throw new Error('Error searching Nelson content');
     }
 
     // Combine results from both tables
@@ -91,78 +95,92 @@ serve(async (req) => {
     Context from Nelson Textbook:
     ${context}`;
 
-    // Call Gemini API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash/generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: systemPrompt }]
-          },
-          {
-            role: "user",
-            parts: [{ text: message }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          topP: 0.8,
-          topK: 40,
-          maxOutputTokens: 2048,
+    try {
+      // Call Gemini API with better error handling
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash/generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: systemPrompt }]
+            },
+            {
+              role: "user",
+              parts: [{ text: message }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            topK: 40,
+            maxOutputTokens: 2048,
           },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ]
-      })
-    });
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        })
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API error:", errorText);
-      throw new Error(`Gemini API error: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Gemini API error response:", errorText);
+        throw new Error(`Gemini API error: ${response.status}`);
+      }
+
+      const geminiResponse = await response.json();
+      
+      if (!geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.error("Invalid Gemini response format:", geminiResponse);
+        throw new Error("Invalid response format from Gemini API");
+      }
+
+      const aiResponse = geminiResponse.candidates[0].content.parts[0].text;
+
+      console.log("Successfully generated response");
+
+      return new Response(
+        JSON.stringify({ 
+          answer: aiResponse,
+          context: relevantChunks
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    } catch (geminiError) {
+      console.error("Gemini API error:", geminiError);
+      throw new Error(`Error generating AI response: ${geminiError.message}`);
     }
-
-    const geminiResponse = await response.json();
-    
-    // Extract the text from the Gemini response
-    const aiResponse = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || 
-      "I apologize, but I couldn't generate a response based on the Nelson Textbook. Please consult a healthcare provider for medical advice.";
-
-    console.log("Successfully generated response");
-
-    // Return the response
-    return new Response(
-      JSON.stringify({ 
-        answer: aiResponse,
-        context: relevantChunks
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
 
   } catch (error) {
     console.error("Error in nelson-chat function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message,
+        answer: "I apologize, but I encountered an error processing your request. Please try again in a moment."
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
