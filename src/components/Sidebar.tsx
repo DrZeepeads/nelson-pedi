@@ -9,6 +9,7 @@ import {
   Home,
   LogIn,
   LogOut,
+  Settings,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +28,7 @@ export const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
     { name: "Chat", href: "/chat", icon: MessageSquare, requiresAuth: true },
     { name: "Drug Calculator", href: "/calculator", icon: Calculator, requiresAuth: true },
     { name: "Growth Charts", href: "/growth-charts", icon: LineChart, requiresAuth: true },
+    { name: "Settings", href: "/settings", icon: Settings, requiresAuth: true },
   ];
 
   return (
