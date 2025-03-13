@@ -101,7 +101,7 @@ const Chat = () => {
               <div className="text-center text-muted-foreground p-8">
                 <h3 className="font-medium text-lg mb-2">Welcome to Nelson-GPT</h3>
                 <p className="mb-2">Ask any pediatric medical question to get evidence-based answers from the Nelson Textbook of Pediatrics.</p>
-                <p className="text-xs mb-4 text-muted-foreground">Powered by Gemini 2.0 Flash AI</p>
+                <p className="text-xs mb-4 text-muted-foreground">Powered by Gemini 1.5 Flash AI</p>
                 <div className="grid grid-cols-1 gap-2 mt-4">
                   <Button variant="outline" onClick={() => setMessage("What are the causes of neonatal jaundice?")}>
                     What are the causes of neonatal jaundice?

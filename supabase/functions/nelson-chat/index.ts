@@ -99,9 +99,14 @@ serve(async (req) => {
     ${context}`;
 
     try {
-      console.log("Sending request to Gemini API");
-      // Correct model name format for Gemini API
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash/generateContent?key=${GEMINI_API_KEY}`, {
+      // Using the correct model name for Gemini 2.0 Flash
+      const modelName = "gemini-1.5-flash";
+      console.log(`Sending request to Gemini API using model: ${modelName}`);
+      
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}/generateContent?key=${GEMINI_API_KEY}`;
+      console.log(`API URL: ${apiUrl.replace(GEMINI_API_KEY, "API_KEY_HIDDEN")}`);
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -146,12 +151,12 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Gemini API error response:", errorText);
+        console.error(`Gemini API error response (${response.status}):`, errorText);
         throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const geminiResponse = await response.json();
-      console.log("Received response from Gemini API");
+      console.log("Received response from Gemini API:", JSON.stringify(geminiResponse).substring(0, 200) + "...");
       
       if (!geminiResponse.candidates || 
           geminiResponse.candidates.length === 0 || 
