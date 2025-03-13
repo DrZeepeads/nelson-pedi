@@ -99,9 +99,9 @@ serve(async (req) => {
     ${context}`;
 
     try {
-      console.log("Sending request to Gemini API");
-      // Call Gemini API with better error handling
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash/generateContent?key=${GEMINI_API_KEY}`, {
+      console.log("Sending request to Gemini API with model: gemini-1.5-flash-latest");
+      // Call Gemini API with better error handling - using the updated model name
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest/generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
