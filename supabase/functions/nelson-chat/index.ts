@@ -16,14 +16,17 @@ serve(async (req) => {
   try {
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     if (!GEMINI_API_KEY) {
+      console.error("Missing Gemini API configuration");
       throw new Error('Missing Gemini API configuration');
     }
+    console.log("Gemini API key is configured");
 
     // Get Supabase connection from environment variables
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
     
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error("Missing Supabase configuration");
       throw new Error('Missing Supabase configuration');
     }
 
@@ -96,6 +99,7 @@ serve(async (req) => {
     ${context}`;
 
     try {
+      console.log("Sending request to Gemini API");
       // Call Gemini API with better error handling
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash/generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
@@ -143,17 +147,26 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Gemini API error response:", errorText);
-        throw new Error(`Gemini API error: ${response.status}`);
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const geminiResponse = await response.json();
+      console.log("Received response from Gemini API");
       
-      if (!geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text) {
-        console.error("Invalid Gemini response format:", geminiResponse);
+      if (!geminiResponse.candidates || 
+          geminiResponse.candidates.length === 0 || 
+          !geminiResponse.candidates[0].content || 
+          !geminiResponse.candidates[0].content.parts || 
+          geminiResponse.candidates[0].content.parts.length === 0) {
+        console.error("Invalid Gemini response format:", JSON.stringify(geminiResponse));
         throw new Error("Invalid response format from Gemini API");
       }
 
       const aiResponse = geminiResponse.candidates[0].content.parts[0].text;
+      if (!aiResponse) {
+        console.error("Empty text in Gemini response:", JSON.stringify(geminiResponse.candidates[0]));
+        throw new Error("Empty response text from Gemini API");
+      }
 
       console.log("Successfully generated response");
 

@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ const Chat = () => {
     setIsTyping(true);
 
     try {
+      console.log("Sending chat request to Supabase function...");
       const { data, error } = await supabase.functions.invoke('nelson-chat', {
         body: {
           message: userQuestion,
@@ -51,11 +53,17 @@ const Chat = () => {
 
       if (error) {
         console.error("Supabase function error:", error);
-        throw new Error(error.message);
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      if (!data || !data.answer) {
-        throw new Error("Invalid response from AI");
+      if (!data) {
+        console.error("Empty response from AI");
+        throw new Error("Empty response from AI");
+      }
+
+      if (!data.answer) {
+        console.error("Invalid response format:", data);
+        throw new Error("Invalid response format from AI");
       }
 
       // Add AI response
@@ -63,14 +71,18 @@ const Chat = () => {
         text: data.answer, 
         sender: "ai" 
       }]);
+      
+      console.log("Successfully processed AI response");
     } catch (error: any) {
       console.error("Error in chat:", error);
       const errorMessage = error?.message || "An unexpected error occurred";
+      
       toast({
         title: "Chat Error",
-        description: "There was an error processing your request. Please try again.",
+        description: `Error: ${errorMessage}. Please try again.`,
         variant: "destructive"
       });
+      
       setMessages(prev => [...prev, { 
         text: "I apologize, but I encountered an error processing your request. Please try again in a moment.", 
         sender: "ai" 
